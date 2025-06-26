@@ -1,0 +1,28 @@
+# 0.0.1: Thu Jun 26 03:00:57 AM AEST 2025
+# Initial version
+# 0.0.2: Thu Jun 26 12:54:05 PM AEST 2025
+# Added password file code
+# 0.0.3: Thu Jun 26 01:01:39 PM AEST 2025
+# Fixes based on linter recomendations
+# 0.0.4: Thu Jun 26 01:01:39 PM AEST 2025
+# Added mask function
+# 0.0.5: Thu Jun 26 02:30:55 PM AEST 2025
+# Added JSON parsing
+# 0.0.6: Thu Jun 26 03:02:51 PM AEST 2025
+# Added tables format
+# 0.0.7: Thu Jun 26 03:18:08 PM AEST 2025
+# Updated documentation
+# 0.0.8: Thu Jun 26 03:35:22 PM AEST 2025
+# Added code to return a specific item of information
+# 0.0.9: Thu Jun 26 03:58:08 PM AEST 2025
+# Added verbose option
+# 0.1.0: Thu Jun 26 04:53:22 PM AEST 2025
+# Added code to check file permissions
+# 0.1.1: Thu Jun 26 05:13:33 PM AEST 2025
+# Fixed password file processing
+# 0.1.2: Thu Jun 26 05:30:17 PM AEST 2025
+# Added pylint switch
+# 0.1.3: Thu Jun 26 05:36:55 PM AEST 2025
+# Fixes based on pylint recommendations
+# 0.1.3: Thu Jun 26 05:56:20 PM AEST 2025
+# Updated documentation
