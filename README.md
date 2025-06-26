@@ -91,7 +91,7 @@ options:
 Turn plug on and save credentials so you don't need to enter them again:
 
 ```
-./rpc.py --plug 192.168.11.63 --user TAPO_USER_EMAIL --pass TAPO_USER_PASS --turn off
+./rpc.py --plug 192.168.11.63 --user TAPO_USER_EMAIL --pass TAPO_USER_PASS --turn off --save
 ```
 
 Toggle power:
