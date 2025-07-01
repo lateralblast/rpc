@@ -5,7 +5,7 @@ RPC
 
 Remote Plug Control
 
-Version: 0.1.3
+Version: 0.1.4
 
 Python Script to control Tapo (and others in the future) Plugs
 
@@ -252,4 +252,12 @@ Get specific item information:
 ```
 ./rpc.py --plug 192.168.11.63 --item model
 model: P110
+```
+
+Scan for plugs:
+
+```
+./rpc.py --scan
+Plug: 192.168.11.73 [P110]
+Plug: 192.168.11.14 [P100]
 ```

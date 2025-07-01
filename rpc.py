@@ -12,7 +12,7 @@
 # pylint: disable=W0621
 
 # Name:         rpc (Remote Plug Control)
-# Version:      0.1.3
+# Version:      0.1.4
 # Release:      1
 # License:      CC-BA (Creative Commons By Attribution)
 #               http://creativecommons.org/licenses/by/4.0/legalcode
@@ -26,10 +26,19 @@
 
 # import modules
 
+import http.server
 import importlib
+import threading
 import argparse
-import stat
+import base64
+import select
+import socket
+import struct
 import json
+import stat
+import time
+import zlib
+import ssl
 import sys
 import os
 import re
@@ -37,6 +46,43 @@ import re
 from os.path import expanduser
 from pprint import pp
 from shutil import which
+
+from Crypto.Cipher import PKCS1_v1_5
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import AES
+
+DEBUG = int(os.getenv("DEBUG") or "0")
+PKT_ONBOARD_REQUEST  = b'\x11\x00' # \x02\x0D\x87\x23'
+PKT_ONBOARD_RESPONSE = b'"\x01'    # \x02\r\x87#'
+
+OUR_KEY = RSA.generate(2048)
+OUR_PUBLIC_KEY = OUR_KEY.public_key().export_key('PEM').decode()
+OUR_CIPHER = PKCS1_OAEP.new(OUR_KEY)
+
+def eprint(*args, **kwargs):
+  if not DEBUG: return
+  print(*args, **kwargs, file=sys.stderr)
+
+def pkcs7_pad(input_str, block_len=16):
+  return input_str + chr(block_len-len(input_str)%block_len)*(block_len-len(input_str)%16)
+
+def pkcs7_unpad(ct):
+  return ct[:-ord(ct[-1])]
+
+class TpLinkCipher:
+  def __init__(self, b_arr: bytearray, b_arr2: bytearray):
+    self.iv  = b_arr2
+    self.key = b_arr
+  def encrypt(self, data):
+    data   = pkcs7_pad(data)
+    cipher = AES.new(bytes(self.key), AES.MODE_CBC, bytes(self.iv))
+    encrypted = cipher.encrypt(data.encode())
+    return base64.b64encode(encrypted).decode().replace("\r\n","")
+  def decrypt(self, data: str):
+    aes = AES.new(bytes(self.key), AES.MODE_CBC, bytes(self.iv))
+    pad_text = aes.decrypt(base64.b64decode(data.encode())).decode()
+    return pkcs7_unpad(pad_text)
 
 # Set some defaults
 
@@ -79,6 +125,72 @@ try:
 except ImportError:
   install_and_import("terminaltables")
   from terminaltables import SingleTable
+
+def extract_pkt_id(packet):
+    return packet[8:12]
+
+def extract_payload_from_package(packet):
+    return packet[16:]
+
+def extract_payload_from_package_json(packet):
+    return json.loads(packet[16:])
+
+def build_packet_for_payload(payload, pkt_type, pkt_id=b"\x01\x02\x03\x04"):
+  len_bytes = struct.pack(">h", len(payload))
+  skeleton = b'\x02\x00\x00\x01'+len_bytes+pkt_type+pkt_id+b'\x5A\x6B\x7C\x8D'+payload
+  calculated_crc32 = zlib.crc32(skeleton) & 0xffffffff
+  calculated_crc32_bytes = struct.pack(">I", calculated_crc32)
+  re = skeleton[0:12] + calculated_crc32_bytes + skeleton[16:]
+  return re
+
+def build_packet_for_payload_json(payload, pkt_type, pkt_id=b"\x01\x02\x03\x04"):
+  return build_packet_for_payload(json.dumps(payload).encode(), pkt_type, pkt_id)
+
+def process_encrypted_handshake(response):
+  encryptedSessionKey = response["result"]["encrypt_info"]["key"]
+  encryptedSessionKeyBytes  = base64.b64decode(encryptedSessionKey.encode())
+  clearSessionKeyBytes = OUR_CIPHER.decrypt(encryptedSessionKeyBytes)
+  if not clearSessionKeyBytes:
+    raise ValueError("Decryption failed!")
+  b_arr  = bytearray()
+  b_arr2 = bytearray()
+  for i in range(0, 16):
+    b_arr.insert(i, clearSessionKeyBytes[i])
+  for i in range(0, 16):
+    b_arr2.insert(i, clearSessionKeyBytes[i + 16])
+  cipher = TpLinkCipher(b_arr, b_arr2)
+  cleartextDataBytes = cipher.decrypt(response["result"]["encrypt_info"]["data"])
+  eprint("handshake payload decrypted as", cleartextDataBytes)
+  return json.loads(cleartextDataBytes)
+
+def find_tapo_devices(timeout=3):
+  packet = build_packet_for_payload_json({"params":{"rsa_key": OUR_PUBLIC_KEY}}, PKT_ONBOARD_REQUEST)
+  sock   = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
+  sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+  sock.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, 5);
+  sock.settimeout(2)
+  sock.sendto(packet, ("255.255.255.255", 20002))
+  eprint("packet sent", packet)
+  pollerObject = select.poll()
+  pollerObject.register(sock, select.POLLIN)
+  before = time.time()
+  while True:
+    fdVsEvent = pollerObject.poll(100) # 0.1 sec
+    if fdVsEvent:
+      handshake_packet, addr = sock.recvfrom(2048)
+      eprint("received", addr, handshake_packet)
+      try:
+        handshake_json = extract_payload_from_package_json(handshake_packet)
+        if handshake_json["error_code"]:
+          continue
+        result = handshake_json["result"]
+        yield result
+      except:
+        pass
+    now = time.time()
+    if now - before > timeout:
+      break
 
 def print_version(file_name):
   """Print version"""
@@ -283,6 +395,23 @@ def save_credentials(options):
       file.write(line)
   check_file_perms(options)
 
+def scan_for_tapo_defices(options):
+  """Scan for Tapo devices"""
+  for device in find_tapo_devices():
+    if options['dump'] is True:
+      print(json.dumps(device, indent=2))
+    else:
+      data = json.dumps(device)
+      data = json.loads(data)
+      info = data['device_type']
+      if re.search(r"PLUG", info):
+        type = data['device_model']
+        if re.search("\\(", type):
+          type = type.split('(')[0]
+        plug = data['ip']
+        line = f"Plug: {plug} [{type}]"
+        print(line)
+
 def run_pylint(file_name):
   """Run pylint"""
   if which("pylint") is None:
@@ -314,10 +443,11 @@ parser.add_argument("--pylint",   action='store_true')  # Run pylint
 parser.add_argument("--tables",   action='store_true')  # Output data in table format
 parser.add_argument("--usage",    action='store_true')  # Get usage information
 parser.add_argument("--dump",     action='store_true')  # Dump JSON from plug with little processing
+parser.add_argument("--info",     action='store_true')  # Get info
 parser.add_argument("--mask",     action='store_true')  # Mask information like serials
 parser.add_argument("--name",     action='store_true')  # Get name
-parser.add_argument("--info",     action='store_true')  # Get info
 parser.add_argument("--save",     action='store_true')  # Save plug IP/hostname, username and password to file
+parser.add_argument("--scan",     action='store_true')  # Scan for Tapo devices
 parser.add_argument("--off",      action='store_true')  # Turn off
 parser.add_argument("--on",       action='store_true')  # Turn on
 
@@ -328,6 +458,10 @@ if options['version'] is True:
 
 if options['pylint'] is True:
   run_pylint(script['file'])
+
+if options['scan']is True:
+  scan_for_tapo_defices(options)
+  sys.exit()
 
 if options['file']:
   if not os.path.exists(options['file']):

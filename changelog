@@ -26,3 +26,5 @@
 # Fixes based on pylint recommendations
 # 0.1.3: Thu Jun 26 05:56:20 PM AEST 2025
 # Updated documentation
+# 0.1.4: Tue Jul  1 23:35:44 AEST 2025
+# Added initial code to scan for tapo devices
