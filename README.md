@@ -5,7 +5,7 @@ RPC
 
 Remote Plug Control
 
-Version: 0.1.4
+Version: 0.1.5
 
 Python Script to control Tapo (and others in the future) Plugs
 

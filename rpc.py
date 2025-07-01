@@ -12,7 +12,7 @@
 # pylint: disable=W0621
 
 # Name:         rpc (Remote Plug Control)
-# Version:      0.1.4
+# Version:      0.1.5
 # Release:      1
 # License:      CC-BA (Creative Commons By Attribution)
 #               http://creativecommons.org/licenses/by/4.0/legalcode
@@ -61,25 +61,32 @@ OUR_PUBLIC_KEY = OUR_KEY.public_key().export_key('PEM').decode()
 OUR_CIPHER = PKCS1_OAEP.new(OUR_KEY)
 
 def eprint(*args, **kwargs):
-  if not DEBUG: return
+  """eprint"""
+  if not DEBUG:
+    return
   print(*args, **kwargs, file=sys.stderr)
 
 def pkcs7_pad(input_str, block_len=16):
+  """Pad pkcs7"""
   return input_str + chr(block_len-len(input_str)%block_len)*(block_len-len(input_str)%16)
 
 def pkcs7_unpad(ct):
+  """Unpad pkcs7"""
   return ct[:-ord(ct[-1])]
 
 class TpLinkCipher:
+  """TpLink Cipher class"""
   def __init__(self, b_arr: bytearray, b_arr2: bytearray):
     self.iv  = b_arr2
     self.key = b_arr
   def encrypt(self, data):
+    """Encrypt"""
     data   = pkcs7_pad(data)
     cipher = AES.new(bytes(self.key), AES.MODE_CBC, bytes(self.iv))
     encrypted = cipher.encrypt(data.encode())
     return base64.b64encode(encrypted).decode().replace("\r\n","")
   def decrypt(self, data: str):
+    """Decrypt"""
     aes = AES.new(bytes(self.key), AES.MODE_CBC, bytes(self.iv))
     pad_text = aes.decrypt(base64.b64decode(data.encode())).decode()
     return pkcs7_unpad(pad_text)
@@ -127,15 +134,19 @@ except ImportError:
   from terminaltables import SingleTable
 
 def extract_pkt_id(packet):
-    return packet[8:12]
+  """Extract pkt id"""
+  return packet[8:12]
 
 def extract_payload_from_package(packet):
-    return packet[16:]
+  """Extract payload from package"""
+  return packet[16:]
 
 def extract_payload_from_package_json(packet):
-    return json.loads(packet[16:])
+  """Extract payload from package JSON"""
+  return json.loads(packet[16:])
 
 def build_packet_for_payload(payload, pkt_type, pkt_id=b"\x01\x02\x03\x04"):
+  """Build packet for payload"""
   len_bytes = struct.pack(">h", len(payload))
   skeleton = b'\x02\x00\x00\x01'+len_bytes+pkt_type+pkt_id+b'\x5A\x6B\x7C\x8D'+payload
   calculated_crc32 = zlib.crc32(skeleton) & 0xffffffff
@@ -144,9 +155,11 @@ def build_packet_for_payload(payload, pkt_type, pkt_id=b"\x01\x02\x03\x04"):
   return re
 
 def build_packet_for_payload_json(payload, pkt_type, pkt_id=b"\x01\x02\x03\x04"):
+  """Build packet for payload JSON"""
   return build_packet_for_payload(json.dumps(payload).encode(), pkt_type, pkt_id)
 
 def process_encrypted_handshake(response):
+  """Process encrypted handshake"""
   encryptedSessionKey = response["result"]["encrypt_info"]["key"]
   encryptedSessionKeyBytes  = base64.b64decode(encryptedSessionKey.encode())
   clearSessionKeyBytes = OUR_CIPHER.decrypt(encryptedSessionKeyBytes)
@@ -164,11 +177,12 @@ def process_encrypted_handshake(response):
   return json.loads(cleartextDataBytes)
 
 def find_tapo_devices(timeout=3):
+  """Find Tapo devices"""
   packet = build_packet_for_payload_json({"params":{"rsa_key": OUR_PUBLIC_KEY}}, PKT_ONBOARD_REQUEST)
   sock   = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
   sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
   sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-  sock.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, 5);
+  sock.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, 5)
   sock.settimeout(2)
   sock.sendto(packet, ("255.255.255.255", 20002))
   eprint("packet sent", packet)
@@ -186,7 +200,7 @@ def find_tapo_devices(timeout=3):
           continue
         result = handshake_json["result"]
         yield result
-      except:
+      except Exception:
         pass
     now = time.time()
     if now - before > timeout:
@@ -405,11 +419,11 @@ def scan_for_tapo_defices(options):
       data = json.loads(data)
       info = data['device_type']
       if re.search(r"PLUG", info):
-        type = data['device_model']
-        if re.search("\\(", type):
-          type = type.split('(')[0]
+        model = data['device_model']
+        if re.search("\\(", model):
+          model = model.split('(')[0]
         plug = data['ip']
-        line = f"Plug: {plug} [{type}]"
+        line = f"Plug: {plug} [{model}]"
         print(line)
 
 def run_pylint(file_name):
