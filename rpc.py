@@ -40,8 +40,8 @@ import time
 import zlib
 import ssl
 import sys
-import os
 import re
+import os
 
 from os.path import expanduser
 from pprint import pp

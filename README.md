@@ -31,16 +31,25 @@ pip install git+https://github.com/almottier/TapoP100.git@main
 
 Modules required:
 
-- terminaltables
+- http.server
 - importlib
+- threading
 - argparse
+- Crypto
+- base64
 - pprint
-- PyP100
+- shutil
+- select
+- socket
+- struct
 - json
 - stat
+- time
+- zlib
+- ssl
 - sys
-- os
 - re
+- os
 
 Todo
 ----
