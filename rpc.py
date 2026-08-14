@@ -12,7 +12,7 @@
 # pylint: disable=W0621
 
 # Name:         rpc (Remote Plug Control)
-# Version:      0.1.5
+# Version:      0.1.6
 # Release:      1
 # License:      CC-BA (Creative Commons By Attribution)
 #               http://creativecommons.org/licenses/by/4.0/legalcode
@@ -47,10 +47,25 @@ from os.path import expanduser
 from pprint import pp
 from shutil import which
 
+def install_and_import(package):
+  """Install and import a python module"""
+  try:
+    importlib.import_module(package)
+  except ImportError:
+    command = f"python3 -m pip install --user {package}"
+    os.system(command)
+  finally:
+    globals()[package] = importlib.import_module(package)
+
+try:
+  from Crypto.Cipher import AES
+except ImportError:
+  install_and_import("pycryptodome")
+  from Crypto.Cipher import AES
+
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
-from Crypto.Cipher import AES
 
 DEBUG = int(os.getenv("DEBUG") or "0")
 PKT_ONBOARD_REQUEST  = b'\x11\x00' # \x02\x0D\x87\x23'
@@ -116,16 +131,6 @@ except ImportError:
   command = "pip install --user git+https://github.com/almottier/TapoP100.git@main"
   os.system(command)
   import PyP100
-
-def install_and_import(package):
-  """Install and import a python module"""
-  try:
-    importlib.import_module(package)
-  except ImportError:
-    command = f"python3 -m pip install --user {package}"
-    os.system(command)
-  finally:
-    globals()[package] = importlib.import_module(package)
 
 try:
   from terminaltables import SingleTable

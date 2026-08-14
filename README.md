@@ -5,7 +5,7 @@ RPC
 
 Remote Plug Control
 
-Version: 0.1.5
+Version: 0.1.6
 
 Python Script to control Tapo (and others in the future) Plugs
 
@@ -28,7 +28,7 @@ The script will try to install this, but it can be installed as follows:
 pip install git+https://github.com/almottier/TapoP100.git@main
 ```
 
-Modules required:
+Standard modules required:
 
 - http.server
 - importlib
@@ -49,6 +49,10 @@ Modules required:
 - sys
 - re
 - os
+
+Additional modules required:
+
+- pycryptodome
 
 Todo
 ----
