@@ -1,1 +1,3 @@
 pycryptodome
+terminaltables
+git+https://github.com/almottier/TapoP100.git@main

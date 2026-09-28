@@ -12,10 +12,10 @@
 # pylint: disable=W0621
 
 # Name:         rpc (Remote Plug Control)
-# Version:      0.1.6
+# Version:      0.1.9
 # Release:      1
-# License:      CC-BA (Creative Commons By Attribution)
-#               http://creativecommons.org/licenses/by/4.0/legalcode
+# License:      CC BY-NC-SA (Creative Commons Attribution-NonCommercial-ShareAlike)
+#               https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
 # Group:        System
 # Source:       N/A
 # URL:          N/A
@@ -286,20 +286,21 @@ def query_plug(options, plug):
       data = json.loads(data)
       key  = options['item'].lower()
       if key == "list":
-        for key in data:
-          print(key)
-      try:
-        value  = data[key]
-        string = f"{key}: {value}"
-        print(string)
-      except KeyError:
-        string = f"Item \"{key}\" does not exist"
-        print()
-        print(string)
-        print()
-        print("List of items:")
-        for key in data:
-          print(key)
+        for item_key in data:
+          print(item_key)
+      else:
+        try:
+          value  = data[key]
+          string = f"{key}: {value}"
+          print(string)
+        except KeyError:
+          string = f"Item \"{key}\" does not exist"
+          print()
+          print(string)
+          print()
+          print("List of items:")
+          for item_key in data:
+            print(item_key)
   if options['data'] == "info":
     info = plug.getDeviceInfo()
     if options['dump'] is True and options['mask'] is False:
@@ -379,6 +380,7 @@ def save_credentials(options):
   """Save credentials"""
   new_array = []
   new_entry = False
+  found     = False
   check_credentials(options)
   if os.path.exists(options['file']):
     file_array = file_to_array(options['file'])
@@ -386,6 +388,7 @@ def save_credentials(options):
       if re.search(":", line):
         hostname = line.split(":")[0]
         if hostname == options['plug']:
+          found    = True
           username = line.split(":")[1]
           password = line.split(":")[2]
           password = password.strip()
@@ -395,9 +398,10 @@ def save_credentials(options):
             new_entry = True
           if new_entry is True:
             line = f"{options['plug']}:{options['user']}:{options['pass']}\n"
-            new_array.append(line)
-        else:
-          new_array.append(line)
+      new_array.append(line)
+    if not found:
+      new_entry = True
+      new_array.append(f"{options['plug']}:{options['user']}:{options['pass']}\n")
     if new_entry is True:
       if options['verbose'] is True:
         string = f"Saving credentials to {options['file']}"
