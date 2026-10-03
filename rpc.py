@@ -2,7 +2,7 @@
 """Script to drive tapo and other plugs"""
 
 # Name:         rpc (Remote Plug Control)
-# Version:      0.2.8
+# Version:      0.3.6
 # Release:      1
 # License:      CC-BA (Creative Commons By Attribution)
 #               http://creativecommons.org/licenses/by/4.0/legalcode
@@ -31,9 +31,9 @@ import zlib
 from pprint import pp
 from shutil import which
 
-__version__ = "0.2.8"
+__version__ = "0.3.6"
 
-DEBUG = int(os.getenv("DEBUG") or "0")
+DEBUG = os.getenv("DEBUG", "").lower() not in ("", "0", "false", "no")
 PKT_ONBOARD_REQUEST = b'\x11\x00'
 SCAN_PORT = 20002
 TAPO_FORK = "git+https://github.com/almottier/TapoP100.git@main"
@@ -53,9 +53,13 @@ def load_module(name, package=None):
         return importlib.import_module(name)
     except ImportError:
         command = [sys.executable, "-m", "pip", "install", "--user", package or name]
-        subprocess.run(command, check=False)
+        result = subprocess.run(command, check=False)
         importlib.invalidate_caches()
-        return importlib.import_module(name)
+        try:
+            return importlib.import_module(name)
+        except ImportError:
+            sys.exit(f"Could not import {name}: install {package or name} manually "
+                     f"(pip exit code {result.returncode})")
 
 
 def pkcs7_pad(input_str, block_len=16):
@@ -216,7 +220,8 @@ def query_plug(options, plug):
         if key == "list":
             print("\n".join(data))
         elif key in data:
-            print(f"{key}: {data[key]}")
+            value = "XXXX" if options['mask'] and MASK_PATTERN.search(key) else data[key]
+            print(f"{key}: {value}")
         else:
             print(f"\nItem \"{key}\" does not exist\n\nList of items:")
             print("\n".join(data))
@@ -272,8 +277,11 @@ def save_credentials(options):
         return
     if options['verbose']:
         print(f"Saving credentials to {options['file']}")
-    os.makedirs(os.path.dirname(options['file']), exist_ok=True)
-    with open(options['file'], "w", encoding="utf-8") as file:
+    directory = os.path.dirname(options['file'])
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    descriptor = os.open(options['file'], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as file:
         for entry in others + [new_entry]:
             file.write(":".join(entry) + "\n")
     check_file_perms(options['file'])
@@ -343,7 +351,7 @@ def main(argv=None):
         scan_for_tapo_devices(options)
         return
     if options['file']:
-        if not os.path.exists(options['file']):
+        if not options['save'] and not os.path.exists(options['file']):
             sys.exit(f"File {options['file']} does not exist")
     else:
         options['file'] = DEFAULT_CREDENTIALS
@@ -358,10 +366,18 @@ def main(argv=None):
             options['data'] = "name"
     if not options['type']:
         options['type'] = "p110" if options['data'] == "usage" else "p100"
-    if options['save']:
-        save_credentials(options)
+    if options['data']:
+        options['data'] = options['data'].lower()
+        if options['data'] not in ("info", "name", "usage"):
+            sys.exit(f"Unsupported data type: {options['data']}")
+    if options['data'] == "usage" and options['type'].lower() != "p110":
+        sys.exit("--data usage requires --type p110")
     if options['turn']:
         options['turn'] = options['turn'].lower()
+        if options['turn'] not in ("on", "off"):
+            sys.exit(f"--turn must be on or off, not {options['turn']}")
+    if options['save']:
+        save_credentials(options)
     plug = None
     if options['turn'] or options['on'] or options['off'] or options['toggle']:
         plug = control_plug(options, connect_plug(options))

@@ -2,6 +2,45 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.6] - 2026-10-03
+
+- Fixed a missing dependency that cannot be pip installed (e.g. on
+  externally managed Python installs) producing a raw `ImportError`
+  traceback; it now exits with a clear message
+
+## [0.3.5] - 2026-10-03
+
+- Fixed `--turn` and `--data` silently doing nothing for unsupported values;
+  they are now rejected, and `--data` is case-insensitive
+
+## [0.3.4] - 2026-10-03
+
+- Fixed `--data usage` with `--type p100` crashing with an `AttributeError`;
+  it now exits with a clear message
+
+## [0.3.3] - 2026-10-03
+
+- Fixed `--mask` being ignored when requesting a single value with `--item`
+
+## [0.3.2] - 2026-10-03
+
+- Fixed `--save` refusing to create a credentials file given with `--file`
+  that does not exist yet
+
+## [0.3.1] - 2026-10-03
+
+- Fixed the credentials file being briefly readable by other users when
+  created; it is now created with mode 0600
+
+## [0.3.0] - 2026-10-03
+
+- Fixed `DEBUG=true` (or any non-numeric value) crashing at startup
+
+## [0.2.9] - 2026-10-03
+
+- Fixed `--save` crashing with `FileNotFoundError` when `--file` is a bare
+  filename with no directory part
+
 ## [0.1.9] - 2026-09-29
 
 - Fixed `requirements.txt`, which listed only `pycryptodome` and omitted
